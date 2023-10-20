@@ -12,7 +12,7 @@
 
 #include <morny/lexer.h>
 
-using namespace lexer;
+using namespace Lexer;
 /*
 enum class ObjectType
 {
@@ -50,9 +50,8 @@ struct Object
 
 int main()
 {
-    lexer::Lexer l;
-    l.lex("3.5346 34f 36 (36) ");
-    std::cout << "TOKENS: " << l.dump();
+    auto vals = Lex("3.5346 34f 36 (36) ");
+    std::cout << "TOKENS: " << Dump(vals);
 
     /*
     Object foo;
