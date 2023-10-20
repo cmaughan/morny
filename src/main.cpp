@@ -50,7 +50,7 @@ struct Object
 
 int main()
 {
-    auto vals = Lex("3.5346 34f 36 (36) ");
+    auto vals = Lex("3.5346 34f 36 (36) foobar __hello MyName");
     std::cout << "TOKENS: " << Dump(vals);
 
     /*

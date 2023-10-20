@@ -17,7 +17,7 @@ inline std::ostream& operator<<(std::ostream& str, const TokenType& type)
     return str;
 }
 
-auto dump(const Token& tok, std::ostringstream& str) -> std::ostringstream&
+auto Dump(const Token& tok, std::ostringstream& str) -> std::ostringstream&
 {
     if (std::holds_alternative<int64_t>(tok))
         str << "int64:" << std::get<int64_t>(tok);
@@ -27,25 +27,11 @@ auto dump(const Token& tok, std::ostringstream& str) -> std::ostringstream&
         str << "float:" << std::get<float>(tok);
     else if (std::holds_alternative<TokenType>(tok))
         str << "TokenType:" << std::get<TokenType>(tok);
+    else if (std::holds_alternative<Identifier>(tok))
+        str << "Identifier:" << std::get<Identifier>(tok).str;
     else
         assert(!"Foo");
     return str;
-}
-
-std::string Dump(const std::vector<LexToken>& tokens)
-{
-    std::ostringstream out;
-    bool first = true;
-    for (auto& tok : tokens)
-    {
-        if (!first)
-        {
-            out << ", ";
-        }
-        first = false;
-        dump(tok.token, out);
-    }
-    return out.str();
 }
 
 struct Lexer
@@ -56,7 +42,7 @@ struct Lexer
     std::vector<LexToken> tokens;
     std::string::iterator itr;
 
-    auto next() -> char
+    auto Next() -> char
     {
         if (itr == str.end())
         {
@@ -76,7 +62,7 @@ struct Lexer
         return c;
     }
 
-    auto peek() -> char
+    auto Peek() -> char
     {
         if (itr == str.end())
         {
@@ -86,18 +72,18 @@ struct Lexer
     }
 
     template <class T>
-    auto emit(T t)
+    auto Emit(T t)
     {
         tokens.push_back(LexToken{ .token = t, .start = start, .end = current });
         start = current;
     }
 
-    auto emit_float(const std::string& val)
+    auto EmitFloat(const std::string& val)
     {
         try
         {
             auto f = std::stof(val);
-            emit(f);
+            Emit(f);
         }
         catch (std::exception& ex)
         {
@@ -105,29 +91,30 @@ struct Lexer
         }
     }
 
-    auto emit_double(const std::string& val)
+    auto EmitDouble(const std::string& val)
     {
         try
         {
             auto f = std::stod(val);
-            emit(f);
+            Emit(f);
         }
         catch (std::exception& ex)
         {
             // TODO: Error
         }
     }
-    auto gather(std::string& str, const std::function<bool(char c)>& fnKeep) -> std::string
+
+    auto Gather(std::string& str, const std::function<bool(char c)>& fnKeep) -> std::string
     {
-        while (fnKeep(peek()))
+        while (fnKeep(Peek()))
         {
-            str.push_back(peek());
-            next();
+            str.push_back(Peek());
+            Next();
         }
         return str;
     }
 
-    void lex(const std::string& input)
+    void Lex(const std::string& input)
     {
         str = input;
         start = current = LexPos{
@@ -147,61 +134,75 @@ struct Lexer
 
 #define MATCH(a, b) \
     case a:         \
-        emit(b);    \
+        Emit(b);    \
         break;
 
-        while (auto c = next())
+        while (auto c = Next())
         {
             switch (c)
             {
                 MATCH('(', TokenType::LeftParen);
                 MATCH(')', TokenType::RightParen);
+            case ' ':
+            case '\n':
+                start = current;
+                break;
 
             default:
             {
-                if (c == ' ')
+                // Ignore white space
+                if (std::isblank(c))
                 {
                     continue;
                 }
                 else if (std::isdigit(c))
                 {
                     std::string val(1, c);
-                    gather(val, [&](auto ch) { return std::isdigit(ch); });
-                    if (peek() == '.')
+                    Gather(val, [&](auto ch) { return std::isdigit(ch); });
+                    if (Peek() == '.')
                     {
                         val.push_back('.');
-                        next();
-                        gather(val, [&](auto ch) { return std::isdigit(ch); });
+                        Next();
+                        Gather(val, [&](auto ch) { return std::isdigit(ch); });
 
-                        switch (peek())
+                        switch (Peek())
                         {
                         case 'f':
-                            next();
-                            emit_float(val);
+                            Next();
+                            EmitFloat(val);
                             break;
                         default:
-                            emit_double(val);
+                            EmitDouble(val);
                             break;
                         }
                     }
                     else
                     {
-                        switch (peek())
+                        switch (Peek())
                         {
                         case 'f':
-                            next();
-                            emit_float(val);
+                            Next();
+                            EmitFloat(val);
                             break;
                         default:
-                            emit(int64_t(std::stoll(val)));
+                            Emit(int64_t(std::stoll(val)));
                         }
                     }
+                }
+                else if (std::isalpha(c) || c == '_')
+                {
+                    // Collect the identifier
+                    std::string ident(1, c);
+                    Gather(ident, [&](auto ch) -> bool {
+                        return std::isalnum(ch);
+                    });
+                    Emit(Identifier{ident});
                 }
                 else if (OPERATORS.find(c) != OPERATORS.end())
                 {
                     char last = c;
                     std::string ops;
-                    gather(ops, [&](auto ch) -> bool {
+                    Gather(ops, [&](auto ch) -> bool {
                         return OPERATORS.find(ch) != OPERATORS.end();
                     });
                     if (!ops.empty())
@@ -224,8 +225,24 @@ struct Lexer
 std::vector<LexToken> Lex(const std::string& str)
 {
     Lexer l;
-    l.lex(str);
+    l.Lex(str);
     return std::move(l.tokens);
+}
+
+std::string Dump(const std::vector<LexToken>& tokens)
+{
+    std::ostringstream out;
+    bool first = true;
+    for (auto& tok : tokens)
+    {
+        if (!first)
+        {
+            out << ", ";
+        }
+        first = false;
+        Dump(tok.token, out);
+    }
+    return out.str();
 }
 
 } // namespace Lexer

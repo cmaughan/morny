@@ -23,7 +23,12 @@ enum class TokenType
     RightParen
 };
 
-using Token = std::variant<std::string, int64_t, float, double, TokenType>;
+struct Identifier
+{
+    std::string str;
+};
+
+using Token = std::variant<std::string, Identifier, int64_t, float, double, TokenType>;
 
 struct LexToken
 {
