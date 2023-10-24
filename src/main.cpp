@@ -19,7 +19,7 @@ using namespace Parser;
 int main()
 {
     //auto vals = Lex("3.5346 34f 36 (36) foobar __hello MyName !32 &*64 if a == 3 else for");
-    std::string input = "{3 + 3}";
+    std::string input = "(3 + 3)";
     std::cout << "INPUT: " << input << std::endl;
 
     auto l = Lex(input);

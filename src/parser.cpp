@@ -132,8 +132,12 @@ struct Parser
         case TokenType::LeftParen:
         {
             Advance();
-            auto expr = Expression(true);
-            std::cout << expr;
+            auto expr = Expression();
+            if (!expr)
+            {
+                Error("Expected expression");
+                return nullptr;
+            }
             Require(TokenType::RightParen);
             return expr;
         }
@@ -141,10 +145,14 @@ struct Parser
         case TokenType::LeftBracket:
         {
             Advance();
-            // TODO: Collect list
-            assert(!"Not done");
+            auto list = CommaSeparated();
+            if (list.empty())
+            {
+                Error("Expected list");
+                return nullptr;
+            }
             Require(TokenType::RightBracket);
-            return ExprPtr{};
+            return Expr::Create(ExprType::Sequence, list);
         }
         break;
         case TokenType::RightBracket:
@@ -166,12 +174,60 @@ struct Parser
 
     auto Chain() -> ExprPtr
     {
-        auto op = Operand();
-        return op;
+        std::vector<ExprPtr> operands;
+        if (auto op = Operand())
+        {
+            operands.push_back(op);
+            while (Peek() && Peek()->token.type == TokenType::Identifier)
+            {
+                auto pOp = Operand();
+                Advance();
+                if (pOp)
+                {
+                    operands.push_back(pOp);
+                }
+            }
+        }
+        else
+        {
+            Error("Expected operand");
+            return nullptr;
+        }
+
+        if (operands.size() == 1)
+        {
+            return operands[0];
+        }
+        return Expr::Create(ExprType::Sequence, operands);
+    }
+
+    auto PeekEndExpression() -> bool
+    {
+        auto pTok = Peek();
+        if (!pTok)
+        {
+            return false;
+        }
+
+        switch (pTok->token.type)
+        {
+        case TokenType::RightBracket:
+        case TokenType::RightParen:
+            return true;
+            break;
+        default:
+            break;
+        }
+        return false;
     }
 
     auto CommaSeparated() -> std::vector<ExprPtr>
     {
+        if (PeekEndExpression())
+        {
+            return std::vector<ExprPtr>();
+        }
+
         auto chain = Chain();
         if (!chain)
         {
@@ -200,18 +256,24 @@ struct Parser
         return pattern;
     }
 
-    auto Expression(bool required = false) -> ExprPtr
+    auto Expression() -> ExprPtr
     {
-
         std::vector<ExprPtr> expressions;
-        while (auto expr = Assignment())
+        if (auto expr = Assignment())
         {
             expressions.push_back(expr);
+            while (Peek() && Peek()->token.type == TokenType::Semicolon)
+            {
+                Advance();
+                if (Peek())
+                {
+                    expressions.push_back(expr);
+                }
+            }
         }
 
-        if (required && expressions.empty())
+        if (expressions.empty())
         {
-            Error("Expected expression");
             return nullptr;
         }
         return Expr::Create(ExprType::Sequence, expressions);

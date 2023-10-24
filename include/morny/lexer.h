@@ -30,6 +30,7 @@ enum class TokenType
     RightParen,
     LeftBracket,
     RightBracket,
+    Semicolon,
     If,
     Else,
     For,

@@ -34,6 +34,9 @@ auto operator<<(std::ostream& str, const TokenType& type) -> std::ostream&
     case TokenType::RightBracket:
         str << ")";
         break;
+    case TokenType::Semicolon:
+        str << ";";
+        break;
     case TokenType::If:
         str << "If";
         break;
@@ -206,6 +209,7 @@ struct Lexer
                 MATCH('}', TokenType::RightParen);
                 MATCH('(', TokenType::LeftBracket);
                 MATCH(')', TokenType::RightBracket);
+                MATCH(';', TokenType::Semicolon);
             case ' ':
             case '\n':
                 start = current;
@@ -269,7 +273,6 @@ struct Lexer
                     {
                         Emit(TokenType::If);
                     }
-                    MATCH_IDENT("if", TokenType::If)
                     MATCH_IDENT("else", TokenType::Else)
                     MATCH_IDENT("for", TokenType::For)
                     else
