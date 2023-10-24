@@ -19,8 +19,21 @@ struct LexPos
 
 enum class TokenType
 {
+    String,
+    Identifier,
+    Int,
+    Float,
+    Double,
+
+    // Operators
     LeftParen,
-    RightParen
+    RightParen,
+    LeftBracket,
+    RightBracket,
+    If,
+    Else,
+    For,
+    Assign
 };
 
 struct Identifier
@@ -28,7 +41,11 @@ struct Identifier
     std::string str;
 };
 
-using Token = std::variant<std::string, Identifier, int64_t, float, double, TokenType>;
+struct Token
+{
+    TokenType type;
+    std::variant<std::monostate, std::string, Identifier, int64_t, float, double> value;
+};
 
 struct LexToken
 {
@@ -39,5 +56,7 @@ struct LexToken
 
 std::vector<LexToken> Lex(const std::string& val);
 std::string Dump(const std::vector<LexToken>& tokens);
+std::string Dump(Token& token);
+std::string Dump(TokenType& tokenType);
 
 } // namespace lexer

@@ -3,35 +3,90 @@
 namespace Lexer
 {
 
-inline std::ostream& operator<<(std::ostream& str, const TokenType& type)
+auto operator<<(std::ostream& str, const TokenType& type) -> std::ostream&
 {
     switch (type)
     {
+    case TokenType::String:
+        str << "String";
+        break;
+    case TokenType::Int:
+        str << "Int";
+        break;
+    case TokenType::Double:
+        str << "Double";
+        break;
+    case TokenType::Float:
+        str << "Float";
+        break;
+    case TokenType::Identifier:
+        str << "Identifier";
+        break;
     case TokenType::LeftParen:
-        str << "(";
+        str << "{";
         break;
     case TokenType::RightParen:
+        str << "}";
+        break;
+    case TokenType::LeftBracket:
+        str << "(";
+        break;
+    case TokenType::RightBracket:
         str << ")";
+        break;
+    case TokenType::If:
+        str << "If";
+        break;
+    case TokenType::Else:
+        str << "Else";
+        break;
+    case TokenType::For:
+        str << "For";
+        break;
+    default:
+        str << "FIXME";
+    }
+    return str;
+}
+
+auto operator<<(std::ostream& str, const Token& tok) -> std::ostream&
+{
+    switch (tok.type)
+    {
+    case TokenType::String:
+        str << tok.type << ": " << std::get<std::string>(tok.value);
+        break;
+    case TokenType::Int:
+        str << tok.type << ": " << std::get<int64_t>(tok.value);
+        break;
+    case TokenType::Double:
+        str << tok.type << ": " << std::get<double>(tok.value);
+        break;
+    case TokenType::Float:
+        str << tok.type << ": " << std::get<float>(tok.value);
+        break;
+    case TokenType::Identifier:
+        str << tok.type << ": " << std::get<Identifier>(tok.value).str;
+        break;
+    default:
+        str << tok.type;
         break;
     }
     return str;
 }
 
-auto Dump(const Token& tok, std::ostringstream& str) -> std::ostringstream&
+std::string Dump(Token& token)
 {
-    if (std::holds_alternative<int64_t>(tok))
-        str << "int64:" << std::get<int64_t>(tok);
-    else if (std::holds_alternative<double>(tok))
-        str << "double:" << std::get<double>(tok);
-    else if (std::holds_alternative<float>(tok))
-        str << "float:" << std::get<float>(tok);
-    else if (std::holds_alternative<TokenType>(tok))
-        str << "TokenType:" << std::get<TokenType>(tok);
-    else if (std::holds_alternative<Identifier>(tok))
-        str << "Identifier:" << std::get<Identifier>(tok).str;
-    else
-        assert(!"Foo");
-    return str;
+    std::ostringstream str;
+    str << token;
+    return str.str();
+}
+
+std::string Dump(TokenType& tokenType)
+{
+    std::ostringstream str;
+    str << tokenType;
+    return str.str();
 }
 
 struct Lexer
@@ -78,12 +133,18 @@ struct Lexer
         start = current;
     }
 
+    auto Emit(TokenType t)
+    {
+        tokens.push_back(LexToken{ .token = Token{ t }, .start = start, .end = current });
+        start = current;
+    }
+
     auto EmitFloat(const std::string& val)
     {
         try
         {
             auto f = std::stof(val);
-            Emit(f);
+            Emit(Token{ TokenType::Float, f });
         }
         catch (std::exception& ex)
         {
@@ -96,7 +157,7 @@ struct Lexer
         try
         {
             auto f = std::stod(val);
-            Emit(f);
+            Emit(Token{ TokenType::Double, f });
         }
         catch (std::exception& ex)
         {
@@ -106,7 +167,7 @@ struct Lexer
 
     auto Gather(std::string& str, const std::function<bool(char c)>& fnKeep) -> std::string
     {
-        while (fnKeep(Peek()))
+        while (Peek() && fnKeep(Peek()))
         {
             str.push_back(Peek());
             Next();
@@ -125,7 +186,7 @@ struct Lexer
         itr = str.begin();
 
         static const std::unordered_set<char> OPERATORS = []() {
-            const std::string ops = "!$%&*+-./|~";
+            const std::string ops = "!$%&*+-./|~<=>";
             std::unordered_set<char> set{
                 ops.begin(), ops.end()
             };
@@ -141,8 +202,10 @@ struct Lexer
         {
             switch (c)
             {
-                MATCH('(', TokenType::LeftParen);
-                MATCH(')', TokenType::RightParen);
+                MATCH('{', TokenType::LeftParen);
+                MATCH('}', TokenType::RightParen);
+                MATCH('(', TokenType::LeftBracket);
+                MATCH(')', TokenType::RightBracket);
             case ' ':
             case '\n':
                 start = current;
@@ -185,7 +248,7 @@ struct Lexer
                             EmitFloat(val);
                             break;
                         default:
-                            Emit(int64_t(std::stoll(val)));
+                            Emit(Token{ TokenType::Int, int64_t(std::stoll(val)) });
                         }
                     }
                 }
@@ -194,20 +257,40 @@ struct Lexer
                     // Collect the identifier
                     std::string ident(1, c);
                     Gather(ident, [&](auto ch) -> bool {
-                        return std::isalnum(ch);
+                        return std::isalnum(ch) || ch == '_';
                     });
-                    Emit(Identifier{ident});
+
+#define MATCH_IDENT(a, t) \
+    else if (ident == a)  \
+    {                     \
+        Emit(t);          \
+    }
+                    if (ident == "if")
+                    {
+                        Emit(TokenType::If);
+                    }
+                    MATCH_IDENT("if", TokenType::If)
+                    MATCH_IDENT("else", TokenType::Else)
+                    MATCH_IDENT("for", TokenType::For)
+                    else
+                    {
+                        Emit(Token{ TokenType::Identifier, Identifier{ ident } });
+                    }
                 }
                 else if (OPERATORS.find(c) != OPERATORS.end())
                 {
-                    char last = c;
-                    std::string ops;
+                    // Collect the operators together
+                    std::string ops(1, c);
                     Gather(ops, [&](auto ch) -> bool {
                         return OPERATORS.find(ch) != OPERATORS.end();
                     });
-                    if (!ops.empty())
+                    if (ops == "=")
                     {
-                        last = ops.back();
+                        Emit(Token{ TokenType::Assign });
+                    }
+                    else
+                    {
+                        Emit(Token{ TokenType::Identifier, Identifier{ ops } });
                     }
                 }
                 else
@@ -240,7 +323,7 @@ std::string Dump(const std::vector<LexToken>& tokens)
             out << ", ";
         }
         first = false;
-        Dump(tok.token, out);
+        out << tok.token;
     }
     return out.str();
 }

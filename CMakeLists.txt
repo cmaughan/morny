@@ -38,9 +38,11 @@ endif()
 
 set(MORNY_SOURCES
     src/lexer.cpp
+    src/parser.cpp
     src/main.cpp
 
     include/morny/lexer.h
+    include/morny/parser.h
 )
 
 add_executable(${PROJECT_NAME} ${OS_BUNDLE} ${MORNY_SOURCES})
